@@ -1,165 +1,257 @@
-#define OLC_PGE_APPLICATION  
-#include "olcPixelGameEngine.h"
+#include <iostream>
+#include <thread>
 #include <vector>
+#include <stdio.h>
+#include <Windows.h>
 
 using namespace std;
 
-struct vec3d {
-    float x, y, z;
-};
+wstring tetromino[7];
+int nFieldWidth = 12;
+int nFieldHeight = 18;
+unsigned char *pField = nullptr;
 
-struct triangle {
-    vec3d p[3];
-};
+int nScreenWidth = 80;
+int nScreenHeight = 30;
 
-struct mesh {
-    vector<triangle> tris;
-};
+int Rotate(int px, int py, int r)
+{
+	int pindex = 0;
+	switch (r % 4)
+	{
+	case 0:
+		pindex = py * 4 + px;
+		break;
+	case 1:
+		pindex = 12 + py - (px * 4);
+		break;
+	case 2:
+		pindex = 15 - (py * 4) - px;
+		break;
+	case 3:
+		pindex = 3 - py + (px * 4);
+		break;
+	}
+	return pindex;
+}
 
-struct mat4x4 {
-    float m[4] [4] = { 0 };
-};
+bool DoesPieceFit(int nTetromino, int nRotation, int nPosX, int nPosY)
+{
+	for (int px = 0; px < 4; px++)
+		for (int py = 0; py < 4; py++)
+		{
+			int pi = Rotate(px, py, nRotation);
+			int fi = (nPosY + py) * nFieldWidth + (nPosX + px);
 
-class olcEngine3D : public olc::PixelGameEngine {
-    public: 
-        olcEngine3D() {
-            sAppName = "3D Demo";
-        }
+			if (nPosX + px >= 0 && nPosX + px < nFieldWidth)
+			{
+				if (nPosY + py >= 0 && nPosY + py < nFieldHeight)
+				{
+					if (tetromino[nTetromino][pi] != L'.' && pField[fi] != 0)
+						return false;
+				}
+			}
+		}
 
-    private:
-        mesh meshCube;
-        mat4x4 matProj;
-        float fTheta = 0.0f;
+	return true;
+}
 
-        void MultiplyMatrixVector(vec3d &i, vec3d &o, mat4x4 &m) {
-            o.x = i.x * m.m[0][0] + i.y * m.m[1][0] + i.z * m.m[2][0] + m.m[3][0] ;
-            o.y = i.x * m.m[0][1] + i.y * m.m[1][1] + i.z * m.m[2][1] + m.m[3][1] ;
-            o.z = i.x * m.m[0][2] + i.y * m.m[1][2] + i.z * m.m[2][2] + m.m[3][2] ;
-            float w = i.x * m.m[0][3] + i.y * m.m[1][3] + i.z * m.m[2][3] + m.m[3][3];
+int main()
+{
+	tetromino[0].append(L"..X.");
+	tetromino[0].append(L"..X.");
+	tetromino[0].append(L"..X.");
+	tetromino[0].append(L"..X.");
 
-            if (w != 0.0f) {
-                o.x /= w; o.y /= w; o.z /= w;
-            }
-        }
+	tetromino[1].append(L"..X.");
+	tetromino[1].append(L".XX.");
+	tetromino[1].append(L".X..");
+	tetromino[1].append(L"....");
 
-    public:
-        bool OnUserCreate() override {
-            meshCube.tris = {
-                //South
-                { 0.0f, 0.0f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 1.0f, 0.0f },
-                { 0.0f, 0.0f, 0.0f,   1.0f, 1.0f, 0.0f,   1.0f, 0.0f, 0.0f },
+	tetromino[2].append(L".X..");
+	tetromino[2].append(L".XX.");
+	tetromino[2].append(L"..X.");
+	tetromino[2].append(L"....");
 
-                //East
-                { 1.0f, 0.0f, 0.0f,   1.0f, 1.0f, 0.0f,   1.0f, 1.0f, 1.0f },
-                { 1.0f, 0.0f, 0.0f,   1.0f, 1.0f, 1.0f,   1.0f, 0.0f, 1.0f },
+	tetromino[3].append(L"....");
+	tetromino[3].append(L".XX.");
+	tetromino[3].append(L".XX.");
+	tetromino[3].append(L"....");
 
-                //North
-                { 1.0f, 0.0f, 1.0f,   1.0f, 1.0f, 1.0f,   0.0f, 1.0f, 1.0f },
-                { 1.0f, 0.0f, 1.0f,   0.0f, 1.0f, 1.0f,   0.0f, 0.0f, 1.0f },
+	tetromino[4].append(L"..X.");
+	tetromino[4].append(L".XX.");
+	tetromino[4].append(L"..X.");
+	tetromino[4].append(L"....");
 
-                //West 
-                { 0.0f, 0.0f, 1.0f,   0.0f, 1.0f, 1.0f,   0.0f, 1.0f, 0.0f },
-                { 0.0f, 0.0f, 1.0f,   0.0f, 1.0f, 0.0f,   0.0f, 0.0f, 0.0f },
+	tetromino[5].append(L"....");
+	tetromino[5].append(L".XX.");
+	tetromino[5].append(L"..X.");
+	tetromino[5].append(L"..X.");
 
-                // Top
-                { 0.0f, 1.0f, 0.0f,   0.0f, 1.0f, 1.0f,   1.0f, 1.0f, 1.0f },
-                { 0.0f, 1.0f, 0.0f,   1.0f, 1.0f, 1.0f,   1.0f, 1.0f, 0.0f },
+	tetromino[6].append(L"....");
+	tetromino[6].append(L".XX.");
+	tetromino[6].append(L".X..");
+	tetromino[6].append(L".X..");
 
-                // BOTTOM
-                { 1.0f, 0.0f, 1.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f, 0.0f },
-                { 1.0f, 0.0f, 1.0f,   0.0f, 0.0f, 0.0f,   1.0f, 0.0f, 0.0f },
+	pField = new unsigned char[nFieldWidth * nFieldHeight];
+	for (int x = 0; x < nFieldWidth; x++)
+		for (int y = 0; y < nFieldHeight; y++)
+			pField[y * nFieldWidth + x] = (x == 0 || x == nFieldWidth - 1 || y == nFieldHeight - 1) ? 9 : 0;
 
-            };
+	wchar_t *screen = new wchar_t[nScreenWidth * nScreenHeight];
+	for (int i = 0; i < nScreenWidth * nScreenHeight; i++) screen[i] = L' ';
+	HANDLE hConsole = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
+	
+	COORD coord = { (SHORT)nScreenWidth, (SHORT)nScreenHeight };
+	SetConsoleScreenBufferSize(hConsole, coord);
+	
+	SetConsoleActiveScreenBuffer(hConsole);
+	DWORD dwBytesWritten = 0;
 
-            // Projection Matrix
+	bool bGameOver = false;
 
-            float fNear = 0.1f;
-            float fFar = 1000.0f;
-            float fFov = 90.0f;
-            float fAspectRatio = (float)ScreenHeight() / (float)ScreenWidth();
-            float fFovRad = 1.0f / tanf(fFov * 0.5f / 180.0f * 3.14159f);
+	int nCurrentPiece = 0;
+	int nCurrentRotation = 0;
+	int nCurrentX = nFieldWidth / 2 - 2;
+	int nCurrentY = 0;
 
-            matProj.m[0][0] = fAspectRatio * fFovRad;
-            matProj.m[1][1] = fFovRad;
-            matProj.m[2][2] = fFar / (fFar - fNear);
-            matProj.m[3][2] = (-fFar * fNear) / (fFar - fNear);
-            matProj.m[2][3] = 1.0f;
-            matProj.m[3][3] = 0.0f;
+	int nSpeed = 20;
+	int nSpeedCount = 0;
+	bool bForceDown = false;
+	bool bKeyHold = false;
+	int nPieceCount = 0;
+	int nScore = 0;
+	vector<int> vLines;
 
-            return true;
-        }   
-        
-        bool OnUserUpdate(float fElapsedTime) override {
-            Clear(olc::BLACK);
+	while (!bGameOver)
+	{
+		this_thread::sleep_for(chrono::milliseconds(50));
+		nSpeedCount++;
+		bForceDown = (nSpeedCount == nSpeed);
 
-        mat4x4 matRotz, matRotx;
-        fTheta += 1.0f * fElapsedTime;
-        
-        //Rotation Z
-        matRotz.m[0][0] = cosf(fTheta); 
-        matRotz.m[0][1] = sinf(fTheta);  
-        matRotz.m[1][0] = -sinf(fTheta);  
-        matRotz.m[1][1] = cosf(fTheta);  
-        matRotz.m[2][2] = 1;  
-        matRotz.m[3][3] = 1;  
-        
-        
-        //Rotation X
-        matRotx.m[0][0] = 1; 
-        matRotx.m[1][1] = sinf(fTheta * 0.5f);  
-        matRotx.m[1][2] = -sinf(fTheta * 0.5f);  
-        matRotx.m[2][1] = cosf(fTheta * 0.5f);  
-        matRotx.m[2][2] = cosf(fTheta * 0.5f);  
-        matRotx.m[3][3] = 1; 
-        
-        
-            //Draw Triangles
-            for (auto tri : meshCube.tris) {
-                triangle triProjected, triTranslated,  triRotatedZ, triRotatedZX;
+		bool bKey[4];
+		bKey[0] = (GetAsyncKeyState((unsigned char)'\x27') & 0x8000) != 0;
+		bKey[1] = (GetAsyncKeyState((unsigned char)'\x25') & 0x8000) != 0;
+		bKey[2] = (GetAsyncKeyState((unsigned char)'\x28') & 0x8000) != 0;
+		bKey[3] = (GetAsyncKeyState((unsigned char)'Z') & 0x8000) != 0;
 
-                MultiplyMatrixVector(tri.p[0], triRotatedZ.p[0], matRotz); 
-                MultiplyMatrixVector(tri.p[1], triRotatedZ.p[1], matRotz); 
-                MultiplyMatrixVector(tri.p[2], triRotatedZ.p[2], matRotz);
-                
-                MultiplyMatrixVector(triRotatedZ.p[0], triRotatedZX.p[0], matRotx);
-                MultiplyMatrixVector(triRotatedZ.p[1], triRotatedZX.p[1], matRotx);
-                MultiplyMatrixVector(triRotatedZ.p[2], triRotatedZX.p[2], matRotx);
+		if (bKey[0])
+		{
+			if (DoesPieceFit(nCurrentPiece, nCurrentRotation, nCurrentX + 1, nCurrentY))
+			{
+				nCurrentX = nCurrentX + 1;
+			}
+		}
 
+		if (bKey[1])
+		{
+			if (DoesPieceFit(nCurrentPiece, nCurrentRotation, nCurrentX - 1, nCurrentY))
+			{
+				nCurrentX = nCurrentX - 1;
+			}
+		}
 
-                triTranslated = triRotatedZX;
-                triTranslated.p[0].z = triRotatedZX.p[0].z + 3.0f;
-                triTranslated.p[1].z = triRotatedZX.p[1].z + 3.0f;
-                triTranslated.p[2].z = triRotatedZX.p[2].z + 3.0f;
+		if (bKey[2])
+		{
+			if (DoesPieceFit(nCurrentPiece, nCurrentRotation, nCurrentX, nCurrentY + 1))
+			{
+				nCurrentY = nCurrentY + 1;
+			}
+		}
 
-                MultiplyMatrixVector(triTranslated.p[0], triProjected.p[0], matProj);
-                MultiplyMatrixVector(triTranslated.p[1], triProjected.p[1], matProj);
-                MultiplyMatrixVector(triTranslated.p[2], triProjected.p[2], matProj);
+		if (bKey[3])
+		{
+			if (!bKeyHold && DoesPieceFit(nCurrentPiece, nCurrentRotation + 1, nCurrentX, nCurrentY))
+			{
+				nCurrentRotation = nCurrentRotation + 1;
+			}
+			bKeyHold = true;
+		}
+		else
+		{
+			bKeyHold = false;
+		}
 
-                triProjected.p[0].x += 1.0f; triProjected.p[0].y += 1.0f;
-                triProjected.p[1].x += 1.0f; triProjected.p[1].y += 1.0f;
-                triProjected.p[2].x += 1.0f; triProjected.p[2].y += 1.0f;
+		if (bForceDown)
+		{
+			nSpeedCount = 0;
+			if (DoesPieceFit(nCurrentPiece, nCurrentRotation, nCurrentX, nCurrentY + 1))
+			{
+				nCurrentY++;
+			}
+			else
+			{
+				for (int px = 0; px < 4; px++)
+					for (int py = 0; py < 4; py++)
+						if (tetromino[nCurrentPiece][Rotate(px, py, nCurrentRotation)] != L'.')
+							pField[(nCurrentY + py) * nFieldWidth + (nCurrentX + px)] = nCurrentPiece + 1;
 
-                triProjected.p[0].x *= 0.5f * (float)ScreenWidth();
-                triProjected.p[0].y *= 0.5f * (float)ScreenHeight();
-                triProjected.p[1].x *= 0.5f * (float)ScreenWidth();
-                triProjected.p[1].y *= 0.5f * (float)ScreenHeight();
-                triProjected.p[2].x *= 0.5f * (float)ScreenWidth();
-                triProjected.p[2].y *= 0.5f * (float)ScreenHeight();
+				nPieceCount++;
+				if (nPieceCount % 10 == 0)
+					if (nSpeed >= 10) nSpeed--;
 
-                DrawTriangle(triProjected.p[0].x, triProjected.p[0].y,
-                                triProjected.p[1].x, triProjected.p[1].y,
-                            triProjected.p[2].x, triProjected.p[2].y,
-                            olc::WHITE);
-            }
-            return true;
-        }
-};
+				for (int py = 0; py < 4; py++)
+				{
+					if (nCurrentY + py < nFieldHeight - 1)
+					{
+						bool bLine = true;
+						for (int px = 1; px < nFieldWidth - 1; px++)
+							bLine &= (pField[(nCurrentY + py) * nFieldWidth + px]) != 0;
 
-int main() {
-    olcEngine3D demo;
-    if (demo.Construct(256, 240, 4, 4))
-        demo.Start();
+						if (bLine)
+						{
+							for (int px = 1; px < nFieldWidth - 1; px++)
+								pField[(nCurrentY + py) * nFieldWidth + px] = 8;
+							vLines.push_back(nCurrentY + py);
+						}
+					}
+				}
 
+				nScore += 25;
+				if (!vLines.empty()) nScore += (1 << vLines.size()) * 100;
 
-    return 0;
+				nCurrentX = nFieldWidth / 2 - 2;
+				nCurrentY = 0;
+				nCurrentRotation = 0;
+				nCurrentPiece = rand() % 7;
+
+				bGameOver = !DoesPieceFit(nCurrentPiece, nCurrentRotation, nCurrentX, nCurrentY);
+			}
+		}
+
+		for (int i = 0; i < nScreenWidth * nScreenHeight; i++) screen[i] = L' ';
+
+		for (int x = 0; x < nFieldWidth; x++)
+			for (int y = 0; y < nFieldHeight; y++)
+				screen[(y + 2) * nScreenWidth + (x + 2)] = L" ABCDEFG=#"[pField[y * nFieldWidth + x]];
+
+		for (int px = 0; px < 4; px++)
+			for (int py = 0; py < 4; py++)
+				if (tetromino[nCurrentPiece][Rotate(px, py, nCurrentRotation)] != L'.')
+					screen[(nCurrentY + py + 2) * nScreenWidth + (nCurrentX + px + 2)] = nCurrentPiece + 65;
+
+		swprintf_s(&screen[2 * nScreenWidth + nFieldWidth + 6], 16, L"SCORE: %d", nScore);
+
+		if (!vLines.empty())
+		{
+			WriteConsoleOutputCharacterW(hConsole, screen, nScreenWidth * nScreenHeight, { 0,0 }, &dwBytesWritten);
+			this_thread::sleep_for(chrono::milliseconds(400));
+
+			for (auto &v : vLines)
+				for (int px = 1; px < nFieldWidth - 1; px++)
+				{
+					for (int py = v; py > 0; py--)
+						pField[py * nFieldWidth + px] = pField[(py - 1) * nFieldWidth + px];
+					pField[px] = 0;
+				}
+			vLines.clear();
+		}
+
+		WriteConsoleOutputCharacterW(hConsole, screen, nScreenWidth * nScreenHeight, { 0,0 }, &dwBytesWritten);
+	}
+
+	CloseHandle(hConsole);
+	cout << "Game Over!! Score:" << nScore << endl;
+	system("pause");
+	return 0;
 }
